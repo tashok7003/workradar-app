@@ -1,8 +1,12 @@
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 
-// Load .env when present (Node 20.6+), without adding a dependency.
-try { process.loadEnvFile?.(); } catch { /* no .env file: rely on the real environment */ }
+// Load .env when present (Node 20.12+), without adding a dependency.
+if (typeof process.loadEnvFile !== "function") {
+  console.warn("Node", process.version, "can't read .env files. Upgrade to Node 20.12 or newer, or export the variables in your shell.");
+} else {
+  try { process.loadEnvFile(); } catch { console.warn("No .env file found: copy .env.example to .env and fill it in."); }
+}
 
 const cfg = loadConfig();
 createApp(cfg).listen(cfg.port, () => {

@@ -14,7 +14,7 @@ It adds a Node API server, live GitHub data and AI briefings from Google Gemini 
 
 ## Run the full app
 
-Requires Node 20.6 or newer.
+Requires Node 20.12 or newer (check with `node -v`).
 
 ```bash
 npm install
