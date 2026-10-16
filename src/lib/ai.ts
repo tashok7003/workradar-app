@@ -51,12 +51,18 @@ export interface ServerHealth {
 }
 
 let healthPromise: Promise<ServerHealth | null> | null = null;
-/** Is WorkRadar's own server running here? null on static hosting (GitHub Pages, Claude). */
-export function serverHealth(): Promise<ServerHealth | null> {
-  if (!healthPromise) {
-    healthPromise = fetch("api/health", { headers: { accept: "application/json" } })
+/**
+ * Is WorkRadar's own server running here? null on static hosting (GitHub Pages,
+ * Claude) or while the API is still starting. A null answer is not cached, so
+ * a server that comes up after the page loads is picked up on the next check.
+ */
+export function serverHealth(force = false): Promise<ServerHealth | null> {
+  if (!healthPromise || force) {
+    const p = fetch("api/health", { headers: { accept: "application/json" }, cache: "no-store" })
       .then((r) => (r.ok && (r.headers.get("content-type") ?? "").includes("json") ? (r.json() as Promise<ServerHealth>) : null))
       .catch(() => null);
+    healthPromise = p;
+    p.then((h) => { if (!h && healthPromise === p) healthPromise = null; });
   }
   return healthPromise;
 }

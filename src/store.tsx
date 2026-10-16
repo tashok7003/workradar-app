@@ -168,6 +168,7 @@ interface Store {
   snoozed: { item: WorkItem; snooze: Snooze }[];
   sources: Record<Source, SourceStatus>;
   server: ServerHealth | null;
+  checkServer: () => Promise<ServerHealth | null>;
   byId: (id: string) => WorkItem | undefined;
   assign: (id: string, to: string | null) => void;
   markDone: (id: string) => void;
@@ -200,7 +201,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const t = setInterval(() => dispatch({ type: "tick" }), 60_000);
     return () => clearInterval(t);
   }, []);
-  useEffect(() => { serverHealth().then(setServer); }, [setServer]);
+  // Find the API server. With `npm run dev` the page can load a few seconds
+  // before the API is listening, so keep checking for a minute before giving up.
+  const checkServer = useCallback(() => serverHealth(true).then((h) => { setServer(h); return h; }), []);
+  useEffect(() => {
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const attempt = () => checkServer().then((h) => {
+      if (!h && ++tries < 12) timer = setTimeout(attempt, 5000);
+    });
+    attempt();
+    return () => clearTimeout(timer);
+  }, [checkServer]);
 
   // Load live GitHub data whenever that source is selected.
   const loadGithub = useCallback((fresh = false) => {
@@ -232,7 +244,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const byId = useCallback((id: string) => items.find((i) => i.id === id), [items]);
 
   const store: Store = {
-    state, items, ranked, snoozed, byId, server,
+    state, items, ranked, snoozed, byId, server, checkServer,
     sources: sourceStatus(state),
     assign: (id, to) => dispatch({ type: "assign", id, to }),
     markDone: (id) => dispatch({ type: "done", id }),

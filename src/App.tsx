@@ -15,7 +15,7 @@ const SOURCES: Source[] = ["jira", "github", "slack", "email"];
 
 function Shell() {
   const { route, go } = useRouter();
-  const { ranked, snoozed, state, sources, server, setHealth, setAiFails, setEmpty, setSource, refresh, reset } = useStore();
+  const { ranked, snoozed, state, sources, server, checkServer, setHealth, setAiFails, setEmpty, setSource, refresh, reset } = useStore();
   const [retrying, setRetrying] = useState<Source | null>(null);
   const nowCount = ranked.filter((r) => r.tier === "now").length;
   const down = SOURCES.filter((s) => sources[s] === "error");
@@ -85,7 +85,7 @@ function Shell() {
           <Popover
             align="start"
             trigger={(toggle, open) => (
-              <button className="btn btn-quiet btn-sm demo-btn" onClick={toggle} aria-expanded={open}>
+              <button className="btn btn-quiet btn-sm demo-btn" onClick={() => { if (!open) void checkServer(); toggle(); }} aria-expanded={open}>
                 <Icon name="sliders" size={14} /> <span>Demo controls</span>
               </button>
             )}
@@ -97,9 +97,11 @@ function Shell() {
                   <input id="demo-src-mock" type="radio" name="demo-src" checked={!live} onChange={() => setSource("mock")} />
                   Mock team (all four sources)
                 </label>
-                <label className={`toggle${server?.github ? "" : " is-disabled"}`} title={server?.github ? undefined : "Run the WorkRadar server with GITHUB_REPOS set"}>
+                <label className={`toggle${server?.github ? "" : " is-disabled"}`}>
                   <input id="demo-src-gh" type="radio" name="demo-src" disabled={!server?.github} checked={live} onChange={() => setSource("github")} />
-                  <span>Live GitHub{server?.github ? ` (${server.github.repos.join(", ")})` : <small> · needs the server</small>}</span>
+                  <span>Live GitHub{server?.github ? ` (${server.github.repos.join(", ")})`
+                    : server ? <small> · add GITHUB_REPOS to .env, then restart</small>
+                    : <small> · API not reachable: run <code>npm run dev</code></small>}</span>
                 </label>
                 <div className="pop-title">Simulate states for review</div>
                 {!live && SOURCES.map((s) => (
