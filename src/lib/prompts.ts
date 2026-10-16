@@ -26,8 +26,12 @@ export interface BriefingContext {
 }
 
 export interface NudgeFacts {
-  /** true: a reply to someone who asked the manager something; false: a nudge to move work forward. */
-  reply: boolean;
+  /**
+   * reply:   someone asked the manager something; draft the answer.
+   * unblock: the work is waiting on the manager; draft the decision that clears it.
+   * nudge:   the work is waiting on someone else; draft a message that moves it.
+   */
+  mode: "reply" | "unblock" | "nudge";
   manager: string;
   channel: "email" | "Slack" | "GitHub";
   recipient: string;
@@ -71,12 +75,23 @@ export function briefingPrompt(ctx: BriefingContext): string {
 }
 
 export function nudgePrompt(f: NudgeFacts): string {
-  const task = f.reply
-    ? `Draft ${f.manager}'s reply to ${f.recipient} (${f.channel === "email" ? "an email" : `a ${f.channel} message`}, 2-4 sentences, plain and direct, no emoji). Acknowledge the ask and commit to a concrete next step. Do not promise dates or facts that are not in the data; where a fact is unknown, say ${f.manager} will confirm it and when.`
-    : `Draft a short ${f.channel === "GitHub" ? "GitHub comment" : "Slack message"} to ${f.recipient} (2-3 sentences, friendly and direct, no emoji) that an engineering manager named ${f.manager} could send to move this work forward.`;
-  const { reply: _r, manager: _m, channel: _c, recipient: _p, ...facts } = f;
+  const medium = f.channel === "email" ? "email" : f.channel === "GitHub" ? "GitHub comment" : "Slack message";
+  const task =
+    f.mode === "reply"
+      ? `Draft ${f.manager}'s reply to ${f.recipient} as a short ${medium} (2-4 sentences). Answer or acknowledge the ask and commit to a concrete next step. Do not promise dates or facts that are not in the data; where a fact is unknown, say ${f.manager} will confirm it and when.`
+      : f.mode === "unblock"
+        ? `${f.manager} is the person this work is waiting on. Draft the ${medium} ${f.manager} posts to clear it (2-3 sentences). Open with the decision or sign-off itself. If the data doesn't say what the decision is, write it as a placeholder in square brackets, like [your decision]. Then say what ${f.recipient} should do next.`
+        : `Draft a short ${medium} from ${f.manager} to ${f.recipient} (2-3 sentences) that moves this work forward: name the specific ask and when it's needed.`;
+  const { mode: _r, manager: _m, channel: _c, recipient: _p, ...facts } = f;
   void _r; void _m; void _c; void _p;
-  return [task, "Use only the facts below. Name the specific ask and a time. Reply with the message text only.", "", JSON.stringify(facts)].join("\n");
+  return [
+    task,
+    "Write in first person as the manager. Plain and direct, no emoji, no greeting filler, no thanking anyone for their patience.",
+    "Write durations in words, and leave out any wait shorter than a day.",
+    "Use only the facts below. Reply with the message text only.",
+    "",
+    JSON.stringify(facts),
+  ].join("\n");
 }
 
 /** Tolerant JSON extraction: whole reply, a fenced block, or the outermost object. */

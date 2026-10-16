@@ -245,21 +245,33 @@ export function wantsReply(item: WorkItem): boolean {
 /** Facts for one item, with names resolved, ready for the server-side prompt. */
 export function nudgeFacts(item: WorkItem): NudgeFacts {
   const b = item.blocker;
-  const reply = wantsReply(item);
-  const recipient = reply
-    ? nameOf(item.author)
-    : b && b.waitingOn !== "me" && b.waitingOn !== "unassigned" ? nameOf(b.waitingOn)
-    : item.assignee && item.assignee !== "me" ? nameOf(item.assignee) : "the team";
+  const mode: NudgeFacts["mode"] = wantsReply(item) ? "reply" : b?.waitingOn === "me" ? "unblock" : "nudge";
+  const other = (id: string | null | undefined) => (id && id !== "me" ? nameOf(id) : null);
+  const recipient =
+    mode === "reply" ? nameOf(item.author)
+    : mode === "unblock" ? other(item.assignee) ?? other(item.author) ?? "whoever picks this up"
+    : b && b.waitingOn !== "unassigned" ? nameOf(b.waitingOn)
+    : other(item.assignee) ?? "the team";
   return {
-    reply,
+    mode,
     manager: manager().name,
     channel: item.source === "email" ? "email" : item.source === "github" ? "GitHub" : "Slack",
     recipient,
     key: item.key, title: item.title, detail: item.body,
     owner: nameOf(item.assignee), author: nameOf(item.author),
-    blocker: b ? { reason: b.reason, waitingOn: nameOf(b.waitingOn), for: span(b.since) } : null,
+    blocker: b ? { reason: b.reason, waitingOn: nameOf(b.waitingOn), for: spanWords(b.since) } : null,
     due: item.dueAt ? dueLabel(item.dueAt) : null,
   };
+}
+
+/** "45 minutes", "26 hours", "3 days": readable in a message, unlike "26h". */
+function spanWords(since: number, now = Date.now()): string {
+  const m = Math.max(1, Math.round((now - since) / 60_000));
+  if (m < 60) return `${m} minute${m === 1 ? "" : "s"}`;
+  const h = Math.round(m / 60);
+  if (h < 48) return `${h} hour${h === 1 ? "" : "s"}`;
+  const d = Math.round(h / 24);
+  return `${d} days`;
 }
 
 export function offlineNudge(item: WorkItem): string {
@@ -268,6 +280,10 @@ export function offlineNudge(item: WorkItem): string {
     const to = firstName(item.author);
     const when = item.dueAt ? (item.dueAt < Date.now() ? "today" : `within the next ${dueLabel(item.dueAt).replace("Due in ", "")}`) : "today";
     return `Hi ${to}, thanks for flagging this. I'm on it and will get back to you with a clear answer ${when}.`;
+  }
+  if (b?.waitingOn === "me") {
+    const to = item.assignee && item.assignee !== "me" ? firstName(item.assignee) : item.author !== "me" ? firstName(item.author) : null;
+    return `Decision on ${item.key}: [your decision]. ${to ? `${to}, you're clear to go ahead.` : "This needs an owner to take it from here."}`;
   }
   if (b && b.waitingOn !== "me" && b.waitingOn !== "unassigned") {
     return `Hi ${firstName(b.waitingOn)}, ${item.key} (${item.title}) has been waiting ${span(b.since)} for ${b.reason}. Could you take a look today, or tell me who else can?`;

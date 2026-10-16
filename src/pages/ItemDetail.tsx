@@ -40,6 +40,7 @@ export function ItemDetail({ id }: { id: string }) {
   const related = item.links.map((l) => byId(l)).filter(Boolean);
   const maxPts = Math.max(...ranked.reasons.map((r) => r.points), 1);
   const reply = wantsReply(item);
+  const unblock = !reply && item.blocker?.waitingOn === "me";
 
   const makeNudge = async () => {
     if (!provider) return;
@@ -112,12 +113,12 @@ export function ItemDetail({ id }: { id: string }) {
               <header className="panel-head">
                 <h2><Icon name="spark" size={16} /> Move it forward</h2>
                 <button className="btn btn-primary btn-sm" onClick={makeNudge} disabled={nudgeState === "loading" || !provider}>
-                  {nudgeState === "loading" ? "Drafting…" : nudge ? "Draft again" : reply ? "Draft a reply" : "Draft a nudge"}
+                  {nudgeState === "loading" ? "Drafting…" : nudge ? "Draft again" : reply ? "Draft a reply" : unblock ? "Draft my decision" : "Draft a nudge"}
                 </button>
               </header>
               {!nudge && nudgeState !== "loading" && (
                 <p className="muted">
-                  {provider?.id === "offline" ? "WorkRadar drafts" : `${provider?.id === "gemini" ? "Gemini" : "Claude"} drafts`} {reply ? `a reply to ${nameOf(item.author)}` : "a short message to whoever can move this forward"}, using only what's in this item.
+                  {provider?.id === "offline" ? "WorkRadar drafts" : `${provider?.id === "gemini" ? "Gemini" : "Claude"} drafts`} {reply ? `a reply to ${nameOf(item.author)}` : unblock ? "the note that clears this, with your decision left as a placeholder if it isn't in the item" : "a short message to whoever can move this forward"}, using only what's in this item.
                 </p>
               )}
               {nudgeState === "loading" && <div className="skeleton" aria-label="Drafting message"><span /><span /><span /></div>}

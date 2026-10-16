@@ -71,3 +71,21 @@ describe("AI output validation", () => {
     for (const l of [...b.attention, ...b.blocked, ...b.happened, b.suggestion]) for (const id of l.ids) expect(known.has(id)).toBe(true);
   });
 });
+
+describe("draft modes", () => {
+  it("drafts the manager's decision when work is blocked on them", async () => {
+    const { nudgeFacts } = await import("./ai");
+    const { nudgePrompt } = await import("./prompts");
+    const f = nudgeFacts(items.find((i) => i.id === "jira-490")!);
+    expect(f.mode).toBe("unblock");
+    expect(f.recipient).toBe("Sara Kim");
+    expect(f.blocker?.for).toMatch(/days|hours|minutes/);
+    expect(nudgePrompt(f)).toContain("[your decision]");
+  });
+  it("replies to whoever asked, and nudges whoever is blocking", async () => {
+    const { nudgeFacts } = await import("./ai");
+    expect(nudgeFacts(items.find((i) => i.id === "email-acme-eta")!).mode).toBe("reply");
+    const pr = nudgeFacts(items.find((i) => i.id === "gh-1287")!);
+    expect(pr).toMatchObject({ mode: "nudge", recipient: "Tom Becker" });
+  });
+});
