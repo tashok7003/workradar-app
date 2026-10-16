@@ -1,0 +1,25 @@
+# One-click deploy of the full app (UI + API) on Render's free plan.
+# Render → New → Blueprint → pick this repo, then fill in the secret values.
+services:
+  - type: web
+    name: workradar
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_REPOS
+        sync: false
+      - key: GITHUB_MANAGER
+        sync: false
+      - key: GITHUB_TEAM
+        sync: false
