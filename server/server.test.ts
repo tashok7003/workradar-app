@@ -119,8 +119,30 @@ describe("Gemini client", () => {
       if (url.endsWith("/interactions")) return new Response("not found", { status: 404 });
       return Response.json({ candidates: [{ content: { parts: [{ text: "ok" }] } }] });
     }) as unknown as typeof fetch;
-    expect(await generate({ apiKey: "k", model: "m", prompt: "p" }, fake)).toBe("ok");
+    expect((await generate({ apiKey: "k", model: "m", prompt: "p" }, fake)).text).toBe("ok");
     expect(calls[1]).toContain("/models/m:generateContent");
+  });
+});
+
+describe("Gemini speed settings", () => {
+  it("asks for low thinking, and retries without it if the model refuses", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fake = (async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      bodies.push(body);
+      if (body.generation_config) return new Response("unsupported", { status: 400 });
+      return Response.json({ steps: [{ type: "model_output", content: [{ type: "text", text: "fast" }] }] });
+    }) as unknown as typeof fetch;
+    const r = await generate({ apiKey: "k", model: "m", prompt: "p", thinking: "minimal" }, fake);
+    expect(r.text).toBe("fast");
+    expect(bodies[0]).toMatchObject({ generation_config: { thinking_level: "minimal" } });
+    expect(bodies[1].generation_config).toBeUndefined();
+  });
+
+  it("gives up after the timeout instead of hanging", async () => {
+    const slow = ((_u: string, init: RequestInit) =>
+      new Promise((_, reject) => init.signal?.addEventListener("abort", () => reject(init.signal!.reason)))) as unknown as typeof fetch;
+    await expect(generate({ apiKey: "k", model: "m", prompt: "p", timeoutMs: 50 }, slow)).rejects.toMatchObject({ status: 504 });
   });
 });
 
@@ -145,7 +167,7 @@ describe("API server", () => {
 
   it("reports what is configured without exposing keys", async () => {
     const h = await (await fetch(`${base}/api/health`)).json();
-    expect(h).toEqual({ ok: true, ai: { provider: "gemini", model: "gemini-3.8-flash" }, github: { repos: ["acme/api"], manager: "ashok", authenticated: false } });
+    expect(h).toEqual({ ok: true, ai: { provider: "gemini", model: "gemini-3.8-flash", draftModel: "gemini-3.5-flash-lite" }, github: { repos: ["acme/api"], manager: "ashok", authenticated: false } });
     expect(JSON.stringify(h)).not.toContain('"k"');
   });
 

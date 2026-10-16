@@ -55,7 +55,7 @@ export function createApp(cfg: Config, fetchImpl: Fetch = fetch) {
   app.get("/api/health", (_req, res) => {
     res.json({
       ok: true,
-      ai: cfg.gemini ? { provider: "gemini", model: cfg.gemini.model } : null,
+      ai: cfg.gemini ? { provider: "gemini", model: cfg.gemini.model, draftModel: cfg.gemini.draftModel } : null,
       github: cfg.github ? { repos: cfg.github.repos, manager: cfg.github.manager, authenticated: !!cfg.github.token } : null,
     });
   });
@@ -90,7 +90,9 @@ export function createApp(cfg: Config, fetchImpl: Fetch = fetch) {
     const hit = req.body?.fresh ? undefined : aiCache.get(key);
     if (hit) { res.json({ briefing: hit, cached: true, model: cfg.gemini.model }); return; }
     try {
-      const text = await generate({ apiKey: cfg.gemini.apiKey, model: cfg.gemini.model, prompt }, fetchImpl);
+      const { text, ms, endpoint } = await generate(
+        { apiKey: cfg.gemini.apiKey, model: cfg.gemini.model, prompt, thinking: "low", timeoutMs: 45_000 }, fetchImpl);
+      console.log(`[ai] briefing ${(ms / 1000).toFixed(1)}s · ${cfg.gemini.model} · ${endpoint}`);
       let briefing: unknown;
       try { briefing = extractJson(text); } catch {
         res.status(502).json({ error: "invalid_json", message: "Gemini's reply wasn't valid JSON." });
@@ -100,7 +102,11 @@ export function createApp(cfg: Config, fetchImpl: Fetch = fetch) {
       res.json({ briefing, cached: false, model: cfg.gemini.model });
     } catch (e) {
       const status = e instanceof GeminiError ? e.status : 502;
-      res.status(status === 429 ? 429 : 502).json({ error: status === 429 ? "rate_limited" : "upstream_error", message: (e as Error).message });
+      console.warn(`[ai] failed: ${(e as Error).message}`);
+      res.status(status === 429 ? 429 : status === 504 ? 504 : 502).json({
+        error: status === 429 ? "rate_limited" : status === 504 ? "timeout" : "upstream_error",
+        message: (e as Error).message,
+      });
     }
   });
 
@@ -114,11 +120,17 @@ export function createApp(cfg: Config, fetchImpl: Fetch = fetch) {
     const clip = (s: unknown, n: number) => String(s ?? "").slice(0, n);
     const prompt = nudgePrompt({ ...facts, title: clip(facts.title, 300), detail: clip(facts.detail, 1500) });
     try {
-      const text = await generate({ apiKey: cfg.gemini.apiKey, model: cfg.gemini.model, prompt }, fetchImpl);
-      res.json({ text: text.replace(/^["“]|["”]$/g, "").trim(), model: cfg.gemini.model });
+      const { text, ms, endpoint } = await generate(
+        { apiKey: cfg.gemini.apiKey, model: cfg.gemini.draftModel, prompt, thinking: "minimal", timeoutMs: 20_000 }, fetchImpl);
+      console.log(`[ai] draft ${(ms / 1000).toFixed(1)}s · ${cfg.gemini.draftModel} · ${endpoint}`);
+      res.json({ text: text.replace(/^["“]|["”]$/g, "").trim(), model: cfg.gemini.draftModel, ms });
     } catch (e) {
       const status = e instanceof GeminiError ? e.status : 502;
-      res.status(status === 429 ? 429 : 502).json({ error: status === 429 ? "rate_limited" : "upstream_error", message: (e as Error).message });
+      console.warn(`[ai] failed: ${(e as Error).message}`);
+      res.status(status === 429 ? 429 : status === 504 ? 504 : 502).json({
+        error: status === 429 ? "rate_limited" : status === 504 ? "timeout" : "upstream_error",
+        message: (e as Error).message,
+      });
     }
   });
 

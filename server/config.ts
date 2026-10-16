@@ -7,7 +7,8 @@ export interface TeamMember { login: string; name: string; role: string }
 
 export interface Config {
   port: number;
-  gemini: { apiKey: string; model: string } | null;
+  /** model: the daily briefing. draftModel: short drafts, where speed matters more. */
+  gemini: { apiKey: string; model: string; draftModel: string } | null;
   github: {
     token: string | null;
     repos: string[]; // "owner/name"
@@ -29,7 +30,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const repos = (env.GITHUB_REPOS ?? "").split(",").map((r) => r.trim()).filter((r) => /^[\w.-]+\/[\w.-]+$/.test(r));
   return {
     port: Number(env.PORT) || 8787,
-    gemini: env.GEMINI_API_KEY ? { apiKey: env.GEMINI_API_KEY, model: env.GEMINI_MODEL || "gemini-3.8-flash" } : null,
+    gemini: env.GEMINI_API_KEY
+      ? {
+          apiKey: env.GEMINI_API_KEY,
+          model: env.GEMINI_MODEL || "gemini-3.8-flash",
+          draftModel: env.GEMINI_DRAFT_MODEL || "gemini-3.5-flash-lite",
+        }
+      : null,
     github: repos.length
       ? {
           token: env.GITHUB_TOKEN || null,

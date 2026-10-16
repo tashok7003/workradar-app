@@ -46,7 +46,7 @@ function getSample(): Promise<SampleFn | null> {
 
 export interface ServerHealth {
   ok: boolean;
-  ai: { provider: "gemini"; model: string } | null;
+  ai: { provider: "gemini"; model: string; draftModel?: string } | null;
   github: { repos: string[]; manager: string; authenticated: boolean } | null;
 }
 

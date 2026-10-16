@@ -35,29 +35,57 @@ export function extractText(data: unknown): string {
   return "";
 }
 
-export async function generate(
-  opts: { apiKey: string; model: string; prompt: string; system?: string; signal?: AbortSignal },
-  fetchImpl: Fetch = fetch,
-): Promise<string> {
-  const headers = { "content-type": "application/json", "x-goog-api-key": opts.apiKey };
+export interface GenerateOptions {
+  apiKey: string;
+  model: string;
+  prompt: string;
+  system?: string;
+  /**
+   * How long the model reasons before answering. Gemini 3 models think by
+   * default; short drafts don't need it. Omitted = the model's own default.
+   */
+  thinking?: "minimal" | "low" | "medium" | "high";
+  /** Give up after this many ms (the caller falls back to a template). */
+  timeoutMs?: number;
+}
 
-  let res = await fetchImpl(`${BASE}/interactions`, {
-    method: "POST",
-    headers,
-    signal: opts.signal,
-    body: JSON.stringify({
-      model: opts.model,
-      input: opts.prompt,
-      ...(opts.system ? { system_instruction: opts.system } : {}),
-    }),
-  });
+export interface GenerateResult { text: string; ms: number; endpoint: "interactions" | "generateContent" }
+
+export async function generate(opts: GenerateOptions, fetchImpl: Fetch = fetch): Promise<GenerateResult> {
+  const started = Date.now();
+  const signal = AbortSignal.timeout(opts.timeoutMs ?? 30_000);
+  const headers = { "content-type": "application/json", "x-goog-api-key": opts.apiKey };
+  const call = (withThinking: boolean) =>
+    fetchImpl(`${BASE}/interactions`, {
+      method: "POST",
+      headers,
+      signal,
+      body: JSON.stringify({
+        model: opts.model,
+        input: opts.prompt,
+        ...(opts.system ? { system_instruction: opts.system } : {}),
+        ...(withThinking && opts.thinking ? { generation_config: { thinking_level: opts.thinking } } : {}),
+      }),
+    });
+
+  let endpoint: GenerateResult["endpoint"] = "interactions";
+  let res: Response;
+  try {
+    res = await call(true);
+    // A model that doesn't accept this thinking level: retry once with its default.
+    if (res.status === 400 && opts.thinking) res = await call(false);
+  } catch (e) {
+    if ((e as Error).name === "TimeoutError") throw new GeminiError(504, `Gemini took longer than ${Math.round((opts.timeoutMs ?? 30_000) / 1000)}s`);
+    throw e;
+  }
 
   if (res.status === 404 || res.status === 400) {
+    endpoint = "generateContent";
     // Older accounts or models: legacy endpoint.
     res = await fetchImpl(`${BASE}/models/${encodeURIComponent(opts.model)}:generateContent`, {
       method: "POST",
       headers,
-      signal: opts.signal,
+      signal,
       body: JSON.stringify({
         ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
         contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
@@ -71,5 +99,5 @@ export async function generate(
   }
   const text = extractText(await res.json()).trim();
   if (!text) throw new GeminiError(502, "Gemini returned no text");
-  return text;
+  return { text, ms: Date.now() - started, endpoint };
 }

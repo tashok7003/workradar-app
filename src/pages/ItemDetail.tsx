@@ -13,7 +13,8 @@ export function ItemDetail({ id }: { id: string }) {
   const { back, go } = useRouter();
   const item = byId(id);
   const [provider, setProvider] = useState<ProviderInfo | null>(null);
-  const [nudge, setNudge] = useState<{ text: string; by: "ai" | "rules" } | null>(null);
+  const [nudge, setNudge] = useState<{ text: string; by: "ai" | "rules"; secs?: number } | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const [nudgeState, setNudgeState] = useState<"idle" | "loading" | "error">("idle");
   const [copied, setCopied] = useState(false);
 
@@ -46,13 +47,18 @@ export function ItemDetail({ id }: { id: string }) {
     if (!provider) return;
     setNudgeState("loading");
     setCopied(false);
+    const started = Date.now();
+    setElapsed(0);
+    const tick = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
     try {
       const text = await draftNudge(provider.id, item, state.aiFails);
-      setNudge({ text, by: provider.id === "offline" ? "rules" : "ai" });
+      setNudge({ text, by: provider.id === "offline" ? "rules" : "ai", secs: (Date.now() - started) / 1000 });
       setNudgeState("idle");
     } catch {
       setNudge({ text: offlineNudge(item), by: "rules" });
       setNudgeState("error");
+    } finally {
+      clearInterval(tick);
     }
   };
 
@@ -113,7 +119,7 @@ export function ItemDetail({ id }: { id: string }) {
               <header className="panel-head">
                 <h2><Icon name="spark" size={16} /> Move it forward</h2>
                 <button className="btn btn-primary btn-sm" onClick={makeNudge} disabled={nudgeState === "loading" || !provider}>
-                  {nudgeState === "loading" ? "Drafting…" : nudge ? "Draft again" : reply ? "Draft a reply" : unblock ? "Draft my decision" : "Draft a nudge"}
+                  {nudgeState === "loading" ? `Drafting… ${elapsed}s` : nudge ? "Draft again" : reply ? "Draft a reply" : unblock ? "Draft my decision" : "Draft a nudge"}
                 </button>
               </header>
               {!nudge && nudgeState !== "loading" && (
@@ -124,10 +130,10 @@ export function ItemDetail({ id }: { id: string }) {
               {nudgeState === "loading" && <div className="skeleton" aria-label="Drafting message"><span /><span /><span /></div>}
               {nudge && nudgeState !== "loading" && (
                 <>
-                  {nudgeState === "error" && <p className="inline-error"><Icon name="alert" size={14} /> The AI model didn't respond, so this is a template draft. Try again in a moment.</p>}
+                  {nudgeState === "error" && <p className="inline-error"><Icon name="alert" size={14} /> The AI model didn't answer in time, so this is a template draft. Try again in a moment.</p>}
                   <blockquote id="nudge-text" className="nudge-text">{nudge.text}</blockquote>
                   <div className="nudge-foot">
-                    <span className="muted">{nudge.by === "ai" ? `Drafted by ${provider?.label}. Check it before sending.` : "Template draft (no AI model connected)."}</span>
+                    <span className="muted">{nudge.by === "ai" ? `Drafted by ${provider?.id === "gemini" ? "Gemini" : provider?.label} in ${nudge.secs?.toFixed(1)}s. Check it before sending.` : "Template draft (no AI model connected)."}</span>
                     <button className="btn btn-quiet btn-sm" onClick={copy}><Icon name={copied ? "check" : "copy"} size={14} /> {copied ? "Copied" : "Copy"}</button>
                   </div>
                 </>
