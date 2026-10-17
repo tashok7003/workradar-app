@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Icon, RadarMark } from "./components/Icon";
-import { Avatar, Banner, Popover, SOURCE_LABEL, ToastProvider } from "./components/ui";
+import { Avatar, Banner, Popover, ToastProvider, useToast } from "./components/ui";
 import { manager } from "./lib/people";
+import { MOCK_SOURCES, sourceColor, sourceLabel } from "./lib/sources";
 import { ago } from "./lib/time";
+import { Sources } from "./pages/Sources";
 import { Dashboard } from "./pages/Dashboard";
 import { Feed } from "./pages/Feed";
 import { ItemDetail } from "./pages/ItemDetail";
@@ -11,15 +13,26 @@ import { RouterProvider, useRouter } from "./router";
 import { StoreProvider, useStore } from "./store";
 import type { Source } from "./types";
 
-const SOURCES: Source[] = ["jira", "github", "slack", "email"];
-
 function Shell() {
   const { route, go } = useRouter();
-  const { ranked, snoozed, state, sources, server, checkServer, setHealth, setAiFails, setEmpty, setSource, refresh, reset } = useStore();
+  const { ranked, snoozed, state, sources, sourceIds, server, checkServer, setHealth, setAiFails, setEmpty, setSource, refresh, reset } = useStore();
+  const toast = useToast();
   const [retrying, setRetrying] = useState<Source | null>(null);
   const nowCount = ranked.filter((r) => r.tier === "now").length;
-  const down = SOURCES.filter((s) => sources[s] === "error");
-  const live = state.source === "github";
+  const live = state.source === "live";
+  const down = sourceIds.filter((s) => sources[s] === "error");
+  const errorOf = (id: string) => state.live?.sources.find((x) => x.id === id)?.error;
+
+  // Back from Google's sign-in page: open Sources and say how it went.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const g = q.get("google");
+    if (!g) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    go({ name: "sources" });
+    toast({ text: g === "connected" ? "Google connected. Add a Calendar or Tasks source." : `Google sign-in didn't finish: ${g}` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // "/" jumps to search from anywhere, as in most work tools.
   useEffect(() => {
@@ -43,6 +56,7 @@ function Shell() {
     { id: "feed", label: "Priority feed", icon: "feed", on: route.name === "feed" && route.tab !== "snoozed", go: () => go({ name: "feed", tab: "now" }), n: nowCount },
     { id: "search", label: "Search", icon: "search", on: route.name === "search", go: () => go({ name: "search" }), kbd: "/" },
     { id: "snoozed", label: "Snoozed", icon: "snooze", on: route.name === "feed" && route.tab === "snoozed", go: () => go({ name: "feed", tab: "snoozed" }), n: snoozed.length || undefined },
+    { id: "sources", label: "Sources", icon: "link", on: route.name === "sources", go: () => go({ name: "sources" }) },
   ];
 
   return (
@@ -64,20 +78,22 @@ function Shell() {
         </nav>
 
         <section className="sources" aria-label="Connected sources">
-          <h2>Sources</h2>
+          <h2>{live ? "Your sources" : "Sources (demo)"}</h2>
           <ul>
-            {SOURCES.map((s) => (
+            {sourceIds.map((s) => (
               <li key={s} className={sources[s] === "error" ? "is-down" : sources[s] === "off" ? "is-off" : ""}>
-                <span className={`dot dot-${sources[s] === "error" ? "error" : sources[s] === "off" ? "off" : "ok"}`} />
-                <span>{SOURCE_LABEL[s]}</span>
+                <span className={`dot dot-${sources[s] === "error" ? "error" : sources[s] === "off" ? "off" : "ok"}`} style={sources[s] === "ok" ? { background: sourceColor(s) } : undefined} />
+                <span className="src-name">{sourceLabel(s)}</span>
                 <span className="src-state">
                   {retrying === s || sources[s] === "loading" ? "Syncing…"
                     : sources[s] === "error" ? "Sync failed"
-                    : sources[s] === "off" ? "Not connected"
-                    : live && state.github ? `Live · ${ago(state.github.fetchedAt, state.now)}` : "Mock data"}
+                    : live && state.live ? ago(state.live.fetchedAt, state.now) : "Mock data"}
                 </span>
               </li>
             ))}
+            {live && !state.loading && sourceIds.length === 0 && (
+              <li><button className="link" onClick={() => go({ name: "sources" })}>Add your first source</button></li>
+            )}
           </ul>
         </section>
 
@@ -95,19 +111,17 @@ function Shell() {
                 <div className="pop-title">Data</div>
                 <label className="toggle">
                   <input id="demo-src-mock" type="radio" name="demo-src" checked={!live} onChange={() => setSource("mock")} />
-                  Mock team (all four sources)
+                  Mock team (demo data)
                 </label>
-                <label className={`toggle${server?.github ? "" : " is-disabled"}`}>
-                  <input id="demo-src-gh" type="radio" name="demo-src" disabled={!server?.github} checked={live} onChange={() => setSource("github")} />
-                  <span>Live GitHub{server?.github ? ` (${server.github.repos.join(", ")})`
-                    : server ? <small> · add GITHUB_REPOS to .env, then restart</small>
-                    : <small> · API not reachable: run <code>npm run dev</code></small>}</span>
+                <label className={`toggle${server ? "" : " is-disabled"}`}>
+                  <input id="demo-src-live" type="radio" name="demo-src" disabled={!server} checked={live} onChange={() => setSource("live")} />
+                  <span>Your sources{server ? ` (${server.sources.length} connected)` : <small> · API not reachable: run <code>npm run dev</code></small>}</span>
                 </label>
                 <div className="pop-title">Simulate states for review</div>
-                {!live && SOURCES.map((s) => (
+                {!live && MOCK_SOURCES.map((s) => (
                   <label key={s} className="toggle">
                     <input id={`demo-${s}`} type="checkbox" checked={state.health[s] === "error"} onChange={(e) => setHealth(s, !e.target.checked)} />
-                    {SOURCE_LABEL[s]} sync fails
+                    {sourceLabel(s)} sync fails
                   </label>
                 ))}
                 <label className="toggle">
@@ -130,16 +144,23 @@ function Shell() {
       </aside>
 
       <main className="main">
+        {live && state.loadError && (
+          <div className="banners">
+            <Banner tone="error" title="Your sources couldn't load" action={<button className="btn btn-quiet btn-sm" onClick={refresh}><Icon name="refresh" size={14} /> Retry</button>}>
+              {state.loadError}
+            </Banner>
+          </div>
+        )}
         {down.length > 0 && (
           <div className="banners">
             {down.map((s) => (
               <Banner
                 key={s}
                 tone="error"
-                title={live ? "GitHub didn't sync" : `${SOURCE_LABEL[s]} didn't sync`}
+                title={`${sourceLabel(s)} didn't sync`}
                 action={<button className="btn btn-quiet btn-sm" onClick={() => retry(s)} disabled={retrying === s || state.loading}><Icon name="refresh" size={14} /> {retrying === s || state.loading ? "Retrying…" : "Retry"}</button>}
               >
-                {live && state.loadError ? state.loadError : `Items from ${SOURCE_LABEL[s]} are missing from the feed, briefing and search until it reconnects.`}
+                {live && errorOf(s) ? errorOf(s) : `Items from ${sourceLabel(s)} are missing from the feed, briefing and search until it reconnects.`}
               </Banner>
             ))}
           </div>
@@ -148,6 +169,7 @@ function Shell() {
         {route.name === "feed" && <Feed tab={route.tab} />}
         {route.name === "item" && <ItemDetail id={route.id} />}
         {route.name === "search" && <Search initial={route.q} />}
+        {route.name === "sources" && <Sources />}
       </main>
     </div>
   );

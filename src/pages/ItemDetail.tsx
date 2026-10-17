@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../components/Icon";
-import { Avatar, EmptyState, ItemActions, SourceBadge, StatusPill, SOURCE_LABEL } from "../components/ui";
+import { Avatar, EmptyState, ItemActions, SourceBadge, StatusPill } from "../components/ui";
+import { sourceLabel } from "../lib/sources";
 import { detectProvider, draftNudge, offlineNudge, wantsReply, type ProviderInfo } from "../lib/ai";
 import { nameOf } from "../lib/people";
 import { scoreItem } from "../lib/priority";
@@ -88,7 +89,7 @@ export function ItemDetail({ id }: { id: string }) {
           <ItemActions item={item} />
           {item.url !== "#" && (
             <a className="btn btn-quiet" href={item.url} target="_blank" rel="noreferrer" title="Mock link: the demo has no live integrations">
-              <Icon name="external" size={15} /> <span>Open in {SOURCE_LABEL[item.source]}</span>
+              <Icon name="external" size={15} /> <span>Open in {sourceLabel(item.source)}</span>
             </a>
           )}
         </div>

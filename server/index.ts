@@ -12,5 +12,6 @@ const cfg = loadConfig();
 createApp(cfg).listen(cfg.port, () => {
   console.log(`WorkRadar API on http://localhost:${cfg.port}`);
   console.log(`  AI:     ${cfg.gemini ? `Gemini (${cfg.gemini.model})` : "off (set GEMINI_API_KEY)"}`);
-  console.log(`  GitHub: ${cfg.github ? cfg.github.repos.join(", ") + (cfg.github.token ? "" : " (no token: 60 requests/hour)") : "off (set GITHUB_REPOS)"}`);
+  console.log(`  Google: ${cfg.google ? `ready (redirect ${cfg.google.redirectUri})` : "off (set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET for Calendar and Tasks)"}`);
+  console.log(`  Sources: add and manage them at ${cfg.publicUrl} → Sources`);
 });

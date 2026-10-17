@@ -1,4 +1,7 @@
 import type { AddressInfo } from "node:net";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { rank } from "../src/lib/priority";
 import { createApp } from "./app";
@@ -161,19 +164,27 @@ describe("API server", () => {
     return Response.json([]);
   }) as unknown as typeof fetch;
 
-  const server = createApp(loadConfig({ GEMINI_API_KEY: "k", GITHUB_REPOS: "acme/api", GITHUB_MANAGER: "ashok" }), fakeFetch).listen(0);
+  const dataDir = mkdtempSync(path.join(tmpdir(), "wr-"));
+  const server = createApp(loadConfig({ GEMINI_API_KEY: "k", GITHUB_REPOS: "acme/api", GITHUB_MANAGER: "ashok", DATA_DIR: dataDir }), fakeFetch).listen(0);
   beforeAll(() => { base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`; });
   afterAll(() => { server.close(); });
 
   it("reports what is configured without exposing keys", async () => {
     const h = await (await fetch(`${base}/api/health`)).json();
-    expect(h).toEqual({ ok: true, ai: { provider: "gemini", model: "gemini-3.8-flash", draftModel: "gemini-3.5-flash-lite" }, github: { repos: ["acme/api"], manager: "ashok", authenticated: false } });
+    expect(h).toMatchObject({
+      ok: true,
+      ai: { provider: "gemini", model: "gemini-3.8-flash", draftModel: "gemini-3.5-flash-lite" },
+      sources: [{ id: "github", type: "github", name: "GitHub" }],
+      google: { configured: false, connected: false },
+    });
     expect(JSON.stringify(h)).not.toContain('"k"');
   });
 
   it("serves the GitHub workspace", async () => {
-    const ws = await (await fetch(`${base}/api/github/workspace`)).json();
+    const ws = await (await fetch(`${base}/api/workspace`)).json();
     expect(ws.items.length).toBeGreaterThan(3);
+    expect(ws.items.every((i: { source: string }) => i.source === "github")).toBe(true);
+    expect(ws.sources[0]).toMatchObject({ id: "github", status: "ok" });
     expect(ws.me.id).toBe("me");
   });
 

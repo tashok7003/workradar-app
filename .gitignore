@@ -5,3 +5,5 @@ dist-single
 *.log
 .env.*
 !.env.example
+# saved sources, Google sign-in and webhook items (contain secrets)
+data/

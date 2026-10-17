@@ -25,3 +25,16 @@ services:
         sync: false
       - key: GITHUB_TEAM
         sync: false
+      # Sources page and Google sign-in
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: PUBLIC_URL
+        sync: false   # e.g. https://workradar.onrender.com
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+# Note: the free plan's disk is wiped on every deploy and restart, so sources
+# added on the Sources page and the Google sign-in reset then. GITHUB_* above
+# re-seeds the GitHub source. For durable storage, add a Render disk and point
+# DATA_DIR at it (paid plans).

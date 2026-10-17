@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { ItemRow } from "../components/ItemRow";
-import { Avatar, EmptyState, SOURCE_LABEL, SourceBadge } from "../components/ui";
+import { Avatar, EmptyState, SourceBadge, SourceDot } from "../components/ui";
+import { sourceLabel } from "../lib/sources";
 import { teamList } from "../lib/people";
 import { TIER_NOW, TIER_TODAY } from "../lib/priority";
 import { ago } from "../lib/time";
@@ -17,10 +18,8 @@ const TABS: { id: FeedTab; label: string; hint: string }[] = [
   { id: "snoozed", label: "Snoozed", hint: "" },
 ];
 
-const SOURCES: Source[] = ["jira", "github", "slack", "email"];
-
 export function Feed({ tab = "now" }: { tab?: FeedTab }) {
-  const { ranked, snoozed, unsnooze, state } = useStore();
+  const { ranked, snoozed, unsnooze, state, sourceIds } = useStore();
   const { go } = useRouter();
   const [sources, setSources] = useState<Source[]>([]);
   const [owner, setOwner] = useState<string>("");
@@ -37,7 +36,7 @@ export function Feed({ tab = "now" }: { tab?: FeedTab }) {
   return (
     <div className="page">
       <header className="page-head">
-        <p className="eyebrow">Ranked across Jira, GitHub, Slack and email</p>
+        <p className="eyebrow">Ranked across {sourceIds.length ? sourceIds.map(sourceLabel).join(", ") : "your sources"}</p>
         <h1>Priority feed</h1>
       </header>
 
@@ -52,9 +51,9 @@ export function Feed({ tab = "now" }: { tab?: FeedTab }) {
       {tab !== "snoozed" && (
         <div className="filters">
           <div className="chips" role="group" aria-label="Filter by source">
-            {SOURCES.map((s) => (
+            {sourceIds.length > 1 && sourceIds.map((s) => (
               <button key={s} className={`chip${sources.includes(s) ? " is-on" : ""}`} aria-pressed={sources.includes(s)} onClick={() => toggleSource(s)}>
-                <span className={`dot dot-${s}`} />{SOURCE_LABEL[s]}
+                <SourceDot source={s} />{sourceLabel(s)}
               </button>
             ))}
           </div>

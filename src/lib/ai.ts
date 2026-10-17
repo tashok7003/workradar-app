@@ -47,7 +47,10 @@ function getSample(): Promise<SampleFn | null> {
 export interface ServerHealth {
   ok: boolean;
   ai: { provider: "gemini"; model: string; draftModel?: string } | null;
-  github: { repos: string[]; manager: string; authenticated: boolean } | null;
+  sources: { id: string; type: string; name: string }[];
+  google: { configured: boolean; connected: boolean; email: string | null };
+  /** true: this browser may manage sources; false: it may not; null: needs the admin token. */
+  canManage: boolean | null;
 }
 
 let healthPromise: Promise<ServerHealth | null> | null = null;

@@ -1,5 +1,9 @@
-export type Source = "jira" | "github" | "slack" | "email";
-export type Kind = "ticket" | "pr" | "message" | "email" | "alert" | "deploy";
+/**
+ * Where an item came from. The mock workspace uses "jira", "github", "slack"
+ * and "email"; live data uses the id of the connector that produced it.
+ */
+export type Source = string;
+export type Kind = "ticket" | "pr" | "message" | "email" | "alert" | "deploy" | "task" | "event";
 export type Status = "todo" | "in_progress" | "review" | "blocked" | "done";
 export type Severity = "p0" | "p1" | "p2" | "p3";
 
@@ -62,7 +66,7 @@ export interface Override {
   snooze?: Snooze;
 }
 
-export type SourceHealth = Record<Source, "ok" | "error">;
+export type SourceHealth = Record<string, "ok" | "error">;
 
 export interface Reason {
   label: string;
@@ -76,3 +80,16 @@ export interface Ranked {
   tier: "now" | "today" | "later";
   reasons: Reason[];
 }
+
+/** What the server reports about each connector in live mode. */
+export interface SourceInfo {
+  id: string;
+  type: ConnectorType;
+  name: string;
+  status: "ok" | "error";
+  error?: string;
+  count: number;
+  fetchedAt: number;
+}
+
+export type ConnectorType = "github" | "google-calendar" | "google-tasks" | "custom-feed" | "webhook";

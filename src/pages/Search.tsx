@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
-import { Avatar, EmptyState, SOURCE_LABEL, SourceBadge, StatusPill } from "../components/ui";
+import { Avatar, EmptyState, SourceBadge, SourceDot, StatusPill } from "../components/ui";
+import { sourceLabel } from "../lib/sources";
 import { nameOf } from "../lib/people";
 import { highlight, search } from "../lib/search";
 import { ago } from "../lib/time";
@@ -9,14 +10,13 @@ import { useStore } from "../store";
 import type { Source } from "../types";
 
 const SUGGESTED = ["Acme", "blocked", "Tom", "security", "checkout", "ledger"];
-const SOURCES: Source[] = ["jira", "github", "slack", "email"];
 
 function Mark({ text, q }: { text: string; q: string }) {
   return <>{highlight(text, q).map((p, i) => (p.hit ? <mark key={i}>{p.text}</mark> : <span key={i}>{p.text}</span>))}</>;
 }
 
 export function Search({ initial = "" }: { initial?: string }) {
-  const { items, state, sources } = useStore();
+  const { items, state, sources, sourceIds } = useStore();
   const { go } = useRouter();
   const [q, setQ] = useState(initial);
   const [source, setSource] = useState<Source | "">("");
@@ -57,9 +57,9 @@ export function Search({ initial = "" }: { initial?: string }) {
       <div className="filters">
         <div className="chips" role="group" aria-label="Source">
           <button className={`chip${!source ? " is-on" : ""}`} aria-pressed={!source} onClick={() => setSource("")}>All sources</button>
-          {SOURCES.map((s) => (
+          {sourceIds.map((s) => (
             <button key={s} className={`chip${source === s ? " is-on" : ""}`} aria-pressed={source === s} onClick={() => setSource(source === s ? "" : s)}>
-              <span className={`dot dot-${s}`} />{SOURCE_LABEL[s]}
+              <SourceDot source={s} />{sourceLabel(s)}
             </button>
           ))}
         </div>
@@ -70,7 +70,7 @@ export function Search({ initial = "" }: { initial?: string }) {
       </div>
 
       {offline.length > 0 && q && (
-        <p className="inline-error"><Icon name="alert" size={14} /> {offline.map((s) => SOURCE_LABEL[s]).join(", ")} didn't sync, so results from {offline.length > 1 ? "those sources" : "it"} are missing.</p>
+        <p className="inline-error"><Icon name="alert" size={14} /> {offline.map(sourceLabel).join(", ")} didn't sync, so results from {offline.length > 1 ? "those sources" : "it"} are missing.</p>
       )}
 
       {!q.trim() ? (
@@ -107,7 +107,7 @@ export function Search({ initial = "" }: { initial?: string }) {
         <EmptyState
           art="search"
           title={`No results for “${q.trim()}”`}
-          body={source ? `Nothing in ${SOURCE_LABEL[source]} matches. Try all sources, or a shorter word.` : "Check the spelling or try a shorter word. Search covers titles, people, labels, descriptions and activity."}
+          body={source ? `Nothing in ${sourceLabel(source)} matches. Try all sources, or a shorter word.` : "Check the spelling or try a shorter word. Search covers titles, people, labels, descriptions and activity."}
           action={source ? <button className="btn btn-quiet" onClick={() => setSource("")}>Search all sources</button> : undefined}
         />
       )}

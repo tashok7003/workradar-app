@@ -33,7 +33,7 @@ export function Dashboard() {
         </header>
         {state.loading ? (
           <div className="panel" aria-busy="true">
-            <p className="muted">Reading pull requests, issues and CI from {state.github?.repos.join(", ") ?? "GitHub"}…</p>
+            <p className="muted">Syncing your sources…</p>
             <div className="skeleton"><span /><span /><span /></div>
           </div>
         ) : state.loadError ? (
@@ -45,8 +45,10 @@ export function Dashboard() {
         ) : (
           <EmptyState
             title="All clear across your sources"
-            body={state.source === "github"
-              ? `Nothing is open in ${state.github?.repos.join(", ")}, and nothing merged or closed in the last 24 hours. WorkRadar will surface new pull requests and issues as they land.`
+            body={state.source === "live"
+              ? state.live?.sources.length
+                ? `Nothing is open in ${state.live.sources.map((s) => s.name).join(", ")}, and nothing finished in the last 24 hours. New work shows up here as it lands.`
+                : "No sources yet. Open Sources in the sidebar to add GitHub, Google Calendar, Google Tasks or your own feed."
               : "Nothing is open in Jira, GitHub, Slack or email for your team. WorkRadar will surface new work as soon as it lands."}
             action={<button className="btn btn-primary" onClick={() => go({ name: "search" })}><Icon name="search" size={15} /> Search past work</button>}
           />

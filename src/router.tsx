@@ -4,7 +4,8 @@ export type Route =
   | { name: "dashboard" }
   | { name: "feed"; tab?: FeedTab }
   | { name: "item"; id: string }
-  | { name: "search"; q?: string };
+  | { name: "search"; q?: string }
+  | { name: "sources" };
 
 export type FeedTab = "now" | "today" | "later" | "snoozed" | "all";
 

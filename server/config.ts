@@ -15,6 +15,14 @@ export interface Config {
     manager: string; // GitHub login of the person using WorkRadar
     team: TeamMember[]; // optional display names and roles
   } | null;
+  /** Where connectors, webhook data and the Google token are saved. */
+  dataDir: string;
+  /** The address people open WorkRadar at; Google sends sign-ins back here. */
+  publicUrl: string;
+  google: { clientId: string; clientSecret: string; redirectUri: string } | null;
+  /** When set, managing sources needs this token (required on a public server). */
+  adminToken: string | null;
+  me: { name: string; role: string };
 }
 
 /** GITHUB_TEAM="octocat:Mona Lisa:Backend engineer,hubot:Hubot:SRE" */
@@ -27,6 +35,9 @@ export function parseTeam(raw: string | undefined): TeamMember[] {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const publicUrl = (env.PUBLIC_URL || "http://localhost:5173").replace(/\/$/, "");
+  const managerLogin = env.GITHUB_MANAGER || "";
+  const meFromTeam = parseTeam(env.GITHUB_TEAM).find((m) => m.login.toLowerCase() === managerLogin.toLowerCase());
   const repos = (env.GITHUB_REPOS ?? "").split(",").map((r) => r.trim()).filter((r) => /^[\w.-]+\/[\w.-]+$/.test(r));
   return {
     port: Number(env.PORT) || 8787,
@@ -45,5 +56,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
           team: parseTeam(env.GITHUB_TEAM),
         }
       : null,
+    dataDir: env.DATA_DIR || "data",
+    publicUrl,
+    google: env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, redirectUri: `${publicUrl}/api/auth/google/callback` }
+      : null,
+    adminToken: env.ADMIN_TOKEN || null,
+    me: {
+      name: env.ME_NAME || meFromTeam?.name || managerLogin || "You",
+      role: env.ME_ROLE || (meFromTeam && meFromTeam.role !== "GitHub contributor" ? meFromTeam.role : "Engineering manager"),
+    },
   };
 }

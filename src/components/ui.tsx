@@ -4,11 +4,14 @@ import { HOUR, nextMorning, nextWeek, clock } from "../lib/time";
 import { useStore } from "../store";
 import type { Reason, Snooze, Source, Status, WorkItem } from "../types";
 import { Icon } from "./Icon";
-
-export const SOURCE_LABEL: Record<Source, string> = { jira: "Jira", github: "GitHub", slack: "Slack", email: "Email" };
+import { sourceColor, sourceLabel } from "../lib/sources";
 
 export function SourceBadge({ source }: { source: Source }) {
-  return <span className={`src src-${source}`}>{SOURCE_LABEL[source]}</span>;
+  return <span className="src" style={{ ["--src" as string]: sourceColor(source) }}>{sourceLabel(source)}</span>;
+}
+
+export function SourceDot({ source }: { source: Source }) {
+  return <span className="dot" style={{ background: sourceColor(source) }} />;
 }
 
 export function Avatar({ id, size = 24 }: { id: string | null | undefined; size?: number }) {
